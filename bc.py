@@ -181,8 +181,6 @@ def bad_chart(svg_to_path, day):
                             bad_data[event_date] += 1
                         else:
                             bad_data[event_date] = 1
-                        # bad_data
-
             else:
                 pass
         else:

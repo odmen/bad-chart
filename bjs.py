@@ -4,15 +4,12 @@ __author__ = 'odmen'
 import sys
 import string
 import random
-import time
 import gzip
-import pygal
-from pygal.style import DarkSolarizedStyle
+import os
+from datetime import datetime
+import time
 
 svg_to_path = ''
-event_elems = {}
-chart_data = []
-bad_data = {}
 gziped = 0
 day = ''
 
@@ -60,6 +57,7 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 def get_line_data(line, data):
+    event_elems = {}
     # функция принимает на вход сырую строку лога и список колонок
     # для вывода (дата напрмиер или user-agent) в виде списка затем
     # пытается вытащить из строки все данные в соответсвии с нашим
@@ -139,23 +137,21 @@ def get_line_data(line, data):
         return {'code': "broken line", 'result': line}
 
 def bad_chart(svg_to_path, day):
-    chart_labels = []
+    current_dir = os.getcwd()
     sorted_data = []
-    # функция нужна для подготовки данных для графика
-    svg_name = id_generator()
-    line_chart = pygal.Bar(fill=True,
-                           interpolate='cubic',
-                           style=DarkSolarizedStyle,
-                           width=1920,
-                           height=1080,
-                           x_label_rotation=40)
-    line_chart.title = 'Bad events from '+day
-
+    bad_data = {}
+    chart_data = []
     if gziped:
         log_file = gzip.open(log_file_path, 'r')
     else:
         log_file = open(log_file_path, 'rb')
     ckeck_list = ['status', 'date', 'rtime', 'url']
+    mins = [ '%02d' % i for i in range(60) ]
+    hours = [ '%02d' % i for i in range(24) ]
+    # bad_data
+    for min in mins:
+        for hour in hours:
+            bad_data[hour+':'+min] = ['',0]
     for line in log_file:
         chck_psbl = 0
         lparse_res = get_line_data(line, ckeck_list)
@@ -174,15 +170,12 @@ def bad_chart(svg_to_path, day):
                 if (event_data['url'] != b'/robots.txt' and chck_psbl):
                     event_day = event_data['date'].split(b'/')[0].decode("utf-8")
                     if int(event_day) == int(day):
-                        event_min = event_data['date'].split(b':')[1].decode("utf-8")
-                        event_sec = event_data['date'].split(b':')[2].decode("utf-8")
-                        event_date = event_day+' '+event_min+':'+event_sec
-                        if event_date in bad_data:
-                            bad_data[event_date] += 1
-                        else:
-                            bad_data[event_date] = 1
-                        # bad_data
-
+                        # datetime.strptime('27/May/2014:10:30:01', '%d/%b/%Y:%H:%M:%S')
+                        event_hour = event_data['date'].split(b':')[1].decode("utf-8")
+                        event_min = event_data['date'].split(b':')[2].decode("utf-8")
+                        event_date = event_hour+':'+event_min
+                        bad_data[event_date][0] = int(time.mktime(datetime.strptime(event_data['date'].decode("utf-8"), '%d/%b/%Y:%H:%M:%S').timetuple())) * 1000
+                        bad_data[event_date][1] += 1
             else:
                 pass
         else:
@@ -191,11 +184,73 @@ def bad_chart(svg_to_path, day):
         sorted_data.append(key)
     sorted_data = sorted(sorted_data)
     for key in sorted_data:
-        # line_chart.add(key, bad_data[key])
-        line_chart.add(key, [{'value': bad_data[key], 'label': key}])
-        chart_labels.append(key)
-        # line_chart.x_labels = chart_labels
-    line_chart.render_to_file('/tmp/'+svg_name+'.svg')
+        # line_chart.add(key, [{'value': bad_data[key], 'label': key}])
+        chart_data.append([key,bad_data[key][0],bad_data[key][1]])
+    print(chart_data)
+    header = open(current_dir+'/temls/header.html')
+    footer = open(current_dir+'/temls/footer.html')
+    body = \
+'''
+    <body>
+        <div id="container"></div>
+        <script defer="defer">
+      var chart = new MeteorChart({
+        container: 'container',
+        width: 500,
+        height: 290,
+        theme: MeteorChart.Themes.Lollapalooza,
+        layout: MeteorChart.Layouts.LineChartWithBottomSlider,
+        components: {
+          slider: {
+            style: {
+              handleWidth: 40,
+              handleHeight: 10
+            }
+          },
+          lineSeries: {
+            data: {
+              series: [
+                {
+                  title: 'Series 1',
+                  points: [
+                    -100, -100,
+                    100, 100,
+                    200, 50
+                  ]
+                },
+                {
+                  title: 'Series 2',
+                  points: [
+                    0, 100,
+                    100, 200,
+                    200, 150,
+                    300, 200
+                  ]
+                }
+              ]
+            }
+          },
+          yAxis: {
+            data: function() {
+              return this.chart.components.lineSeries.getViewportMinMaxY();
+            },
+            style: {
+              increment: 100
+            }
+          },
+          xAxis: {
+            data: function() {
+              return this.chart.components.lineSeries.getViewportMinMaxX();
+            },
+            style: {
+              increment: 100
+            }
+          }
+        }
+      });
+    </script>
+  </body>
+'''
 
 if not day:
     sys.exit('Не указан день')
