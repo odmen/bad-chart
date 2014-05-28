@@ -4,17 +4,14 @@ __author__ = 'odmen'
 import sys
 import string
 import random
-import time
 import gzip
-import pygal
-from pygal.style import DarkSolarizedStyle
+import os
+from datetime import datetime
+import time
 
 svg_to_path = ''
-event_elems = {}
-chart_data = []
-bad_data = {}
 gziped = 0
-day = ''
+sdate = ''
 
 
 if len(sys.argv) == 1:
@@ -38,7 +35,7 @@ for arg in sys.argv:
         svg_to_path = sys.argv[currindex + 1]
     if arg == "-d":
         # если текущий элемент - "-l"
-        day = sys.argv[currindex + 1]
+        sdate = sys.argv[currindex + 1]
     if arg == "-g":
         # если текущий элемент - "-l"
         gziped = 1
@@ -60,6 +57,7 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 def get_line_data(line, data):
+    event_elems = {}
     # функция принимает на вход сырую строку лога и список колонок
     # для вывода (дата напрмиер или user-agent) в виде списка затем
     # пытается вытащить из строки все данные в соответсвии с нашим
@@ -138,24 +136,21 @@ def get_line_data(line, data):
     else:
         return {'code': "broken line", 'result': line}
 
-def bad_chart(svg_to_path, day):
-    chart_labels = []
+def bad_chart(svg_to_path, sdate):
+    current_dir = os.getcwd()
     sorted_data = []
-    # функция нужна для подготовки данных для графика
-    svg_name = id_generator()
-    line_chart = pygal.Bar(fill=True,
-                           interpolate='cubic',
-                           style=DarkSolarizedStyle,
-                           width=1920,
-                           height=1080,
-                           x_label_rotation=40)
-    line_chart.title = 'Bad events from '+day
-
+    bad_data = {}
+    chart_data = []
     if gziped:
         log_file = gzip.open(log_file_path, 'r')
     else:
         log_file = open(log_file_path, 'rb')
     ckeck_list = ['status', 'date', 'rtime', 'url']
+    mins = [ '%02d' % i for i in range(60) ]
+    hours = [ '%02d' % i for i in range(24) ]
+    for min in mins:
+        for hour in hours:
+            bad_data[sdate+':'+hour+':'+min] = 0
     for line in log_file:
         chck_psbl = 0
         lparse_res = get_line_data(line, ckeck_list)
@@ -172,15 +167,10 @@ def bad_chart(svg_to_path, day):
             if chck_psbl:
                 url = event_data['url']
                 if (event_data['url'] != b'/robots.txt' and chck_psbl):
-                    event_day = event_data['date'].split(b'/')[0].decode("utf-8")
-                    if int(event_day) == int(day):
-                        event_min = event_data['date'].split(b':')[1].decode("utf-8")
-                        event_sec = event_data['date'].split(b':')[2].decode("utf-8")
-                        event_date = event_day+' '+event_min+':'+event_sec
-                        if event_date in bad_data:
-                            bad_data[event_date] += 1
-                        else:
-                            bad_data[event_date] = 1
+                    event_sdate = event_data['date'].split(b':')[0].decode("utf-8")
+                    if event_sdate == sdate:
+                        event_date = event_data['date'].decode("utf-8")[:-3]
+                        bad_data[event_date] += 1
             else:
                 pass
         else:
@@ -189,16 +179,84 @@ def bad_chart(svg_to_path, day):
         sorted_data.append(key)
     sorted_data = sorted(sorted_data)
     for key in sorted_data:
-        # line_chart.add(key, bad_data[key])
-        line_chart.add(key, [{'value': bad_data[key], 'label': key}])
-        chart_labels.append(key)
-        # line_chart.x_labels = chart_labels
-    line_chart.render_to_file('/tmp/'+svg_name+'.svg')
+        # {"date": key,"value": bad_data[key]}
+        chart_data.append({"date": key,"value": bad_data[key]})
+    print(chart_data)
+    header = open(current_dir+'/temls/header.html').read()
+    footer = open(current_dir+'/temls/footer.html').read()
+    body = \
+'''
+  <body>
+<script type="text/javascript">
+var chart = AmCharts.makeChart("chartdiv", {
+        "type": "serial",
+        "theme": "none",
+        "pathToImages": "http://www.amcharts.com/lib/3/images/",
+        "dataDateFormat": "DD/MMM/YYYY:JJ:NN",
+        "valueAxes": [{
+            "axisAlpha": 0,
+            "position": "left"
+        }],
+        "graphs": [{
+      "id": "g1",
+            "bullet": "round",
+            "bulletBorderAlpha": 1,
+            "bulletColor": "#FFFFFF",
+            "bulletSize": 5,
+            "hideBulletsCount": 50,
+            "lineThickness": 2,
+            "title": "red line",
+            "useLineColorForBulletBorder": true,
+            "valueField": "value"
+        }],
+        "chartScrollbar": {
+      "graph": "g1",
+      "scrollbarHeight": 30
+    },
+        "chartCursor": {
+            "cursorPosition": "mouse",
+            "pan": true
+        },
+        "categoryField": "date",
+        "categoryAxis": {
+            "parseDates": true,
+            "dashLength": 1,
+            "minorGridEnabled": true,
+            "position": "top"
+        },
+        exportConfig:{
+          menuRight: '20px',
+          menuBottom: '50px',
+          menuItems: [{
+          icon: 'http://www.amcharts.com/lib/3/images/export.png',
+          format: 'png'
+          }]
+        },
+        "dataProvider": '''+str(chart_data)+'''
+    }
+);
 
-if not day:
+chart.addListener("rendered", zoomChart);
+
+zoomChart();
+function zoomChart(){
+    chart.zoomToIndexes(chart.dataProvider.length - 40, chart.dataProvider.length - 1);
+}
+</script>
+  <div id="chartdiv"></div>
+  </body>
+'''
+
+    result_html = open(current_dir+'/temls/result.html','w')
+    result_html.write(header+body+footer)
+    # header.close()
+    # footer.close()
+    result_html.close()
+
+if not sdate:
     sys.exit('Не указан день')
 elif svg_to_path == '':
     print('Не указан путь до сохраниения файла результата')
     print('Файл будет сохранен в "/tmp" со случайным именем')
 
-bad_chart(svg_to_path, day)
+bad_chart(svg_to_path, sdate)
