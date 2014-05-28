@@ -167,10 +167,8 @@ def bad_chart(svg_to_path, sdate):
             if chck_psbl:
                 url = event_data['url']
                 if (event_data['url'] != b'/robots.txt' and chck_psbl):
-                    event_sdate = event_data['date'].split(b':')[0].decode("utf-8")
-                    if event_sdate == sdate:
-                        event_date = event_data['date'].decode("utf-8")[:-3]
-                        bad_data[event_date] += 1
+                    event_date = event_data['date'].decode("utf-8")[:-3]
+                    bad_data[event_date] += 1
             else:
                 pass
         else:
@@ -186,71 +184,61 @@ def bad_chart(svg_to_path, sdate):
     footer = open(current_dir+'/temls/footer.html').read()
     body = \
 '''
-  <body>
-<script type="text/javascript">
-var chart = AmCharts.makeChart("chartdiv", {
-        "type": "serial",
-        "theme": "none",
-        "pathToImages": "http://www.amcharts.com/lib/3/images/",
-        "dataDateFormat": "DD/MMM/YYYY:JJ:NN",
-        "valueAxes": [{
-            "axisAlpha": 0,
-            "position": "left"
-        }],
-        "graphs": [{
-      "id": "g1",
-            "bullet": "round",
-            "bulletBorderAlpha": 1,
-            "bulletColor": "#FFFFFF",
-            "bulletSize": 5,
-            "hideBulletsCount": 50,
-            "lineThickness": 2,
-            "title": "red line",
-            "useLineColorForBulletBorder": true,
-            "valueField": "value"
-        }],
-        "chartScrollbar": {
-      "graph": "g1",
-      "scrollbarHeight": 30
-    },
-        "chartCursor": {
-            "cursorPosition": "mouse",
-            "pan": true
-        },
-        "categoryField": "date",
-        "categoryAxis": {
-            "parseDates": true,
-            "dashLength": 1,
-            "minorGridEnabled": true,
-            "position": "top"
-        },
-        exportConfig:{
-          menuRight: '20px',
-          menuBottom: '50px',
-          menuItems: [{
-          icon: 'http://www.amcharts.com/lib/3/images/export.png',
-          format: 'png'
-          }]
-        },
-        "dataProvider": '''+str(chart_data)+'''
-    }
-);
-
-chart.addListener("rendered", zoomChart);
-
-zoomChart();
-function zoomChart(){
-    chart.zoomToIndexes(chart.dataProvider.length - 40, chart.dataProvider.length - 1);
-}
-</script>
-  <div id="chartdiv"></div>
-  </body>
+	<body>
+		<!-- amCharts javascript code -->
+		<script type="text/javascript">
+			AmCharts.makeChart("chartdiv",
+				{
+					"type": "serial",
+					"pathToImages": "http://cdn.amcharts.com/lib/3/images/",
+					"categoryField": "date",
+					"dataDateFormat": "DD/MMM/YYYY:JJ:NN",
+					"categoryAxis": {
+						"minPeriod": "mm",
+						"parseDates": true
+					},
+					"chartCursor": {
+						"categoryBalloonDateFormat": "JJ:NN"
+					},
+					"chartScrollbar": {},
+					"trendLines": [],
+					"graphs": [
+						{
+							"bullet": "round",
+							"id": "AmGraph-1",
+							"title": "graph 1",
+							"valueField": "value"
+						}
+					],
+					"guides": [],
+					"valueAxes": [
+						{
+							"id": "ValueAxis-1",
+							"title": "Axis title"
+						}
+					],
+					"allLabels": [],
+					"balloon": {},
+					"legend": {
+						"useGraphSettings": true
+					},
+					"titles": [
+						{
+							"id": "Title-1",
+							"size": 15,
+							"text": "Chart Title"
+						}
+					],
+					"dataProvider": '''+str(chart_data)+'''
+				}
+			);
+		</script>
+		<div id="chartdiv" style="width: 100%; height: 400px; background-color: #FFFFFF;" ></div>
+	</body>
 '''
 
     result_html = open(current_dir+'/temls/result.html','w')
     result_html.write(header+body+footer)
-    # header.close()
-    # footer.close()
     result_html.close()
 
 if not sdate:
