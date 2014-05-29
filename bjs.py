@@ -13,16 +13,15 @@ svg_to_path = ''
 gziped = 0
 sdate = ''
 
-
 if len(sys.argv) == 1:
-        print('''
+    print('''
 -l Полный путь до лог-файла
 -o Полный путь для сохранения svg
 -d День в числовом значении
 -g Открывать файл как .gz
 --help Вывести эту справку
         ''')
-        sys.exit()
+    sys.exit()
 for arg in sys.argv:
     # перебираем аргументы, переданные скрипту
     currindex = sys.argv.index(arg)
@@ -49,12 +48,14 @@ for arg in sys.argv:
         ''')
         sys.exit()
 
+
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
-# функция берет последовательность букв и цифр
-# берет из этой последовательности случайные символы
-# последовательность длинной 6 символов
-# возвращает эту последовательность
+    # функция берет последовательность букв и цифр
+    # берет из этой последовательности случайные символы
+    # последовательность длинной 6 символов
+    # возвращает эту последовательность
     return ''.join(random.choice(chars) for _ in range(size))
+
 
 def get_line_data(line, data):
     event_elems = {}
@@ -67,7 +68,7 @@ def get_line_data(line, data):
     # функции, если строка соответствовала формату лога, то в этом
     # json есть свойства с нужными данными, а если не соответствовала,
     # то в нем вся сломанная строка
-    line = line.replace(b'\n',b'')
+    line = line.replace(b'\n', b'')
     # заменяем все символны перехода на новую строку в строке
     line_list = line.split(b'"')
     # разбиваем строку по двойной ковычке
@@ -136,21 +137,22 @@ def get_line_data(line, data):
     else:
         return {'code': "broken line", 'result': line}
 
+
 def bad_chart(svg_to_path, sdate):
     current_dir = os.getcwd()
     sorted_data = []
     bad_data = {}
     chart_data = []
     if gziped:
-        log_file = gzip.open(log_file_path, 'r')
+        log_file = gzip.open(log_file_path, 'rb')
     else:
         log_file = open(log_file_path, 'rb')
     ckeck_list = ['status', 'date', 'rtime', 'url']
-    mins = [ '%02d' % i for i in range(60) ]
-    hours = [ '%02d' % i for i in range(24) ]
+    mins = ['%02d' % i for i in range(60)]
+    hours = ['%02d' % i for i in range(24)]
     for min in mins:
         for hour in hours:
-            bad_data[sdate+':'+hour+':'+min] = 0
+            bad_data[sdate + ':' + hour + ':' + min] = 0
     for line in log_file:
         chck_psbl = 0
         lparse_res = get_line_data(line, ckeck_list)
@@ -177,13 +179,12 @@ def bad_chart(svg_to_path, sdate):
         sorted_data.append(key)
     sorted_data = sorted(sorted_data)
     for key in sorted_data:
-        # {"date": key,"value": bad_data[key]}
-        chart_data.append({"date": key,"value": bad_data[key]})
+        chart_data.append({"date": key, "value": bad_data[key]})
     print(chart_data)
-    header = open(current_dir+'/temls/header.html').read()
-    footer = open(current_dir+'/temls/footer.html').read()
+    header = open(current_dir + '/temls/header.html').read()
+    footer = open(current_dir + '/temls/footer.html').read()
     body = \
-'''
+        '''
 	<body>
 		<!-- amCharts javascript code -->
 		<script type="text/javascript">
@@ -229,7 +230,7 @@ def bad_chart(svg_to_path, sdate):
 							"text": "Chart Title"
 						}
 					],
-					"dataProvider": '''+str(chart_data)+'''
+					"dataProvider": ''' + str(chart_data) + '''
 				}
 			);
 		</script>
@@ -237,9 +238,10 @@ def bad_chart(svg_to_path, sdate):
 	</body>
 '''
 
-    result_html = open(current_dir+'/temls/result.html','w')
-    result_html.write(header+body+footer)
+    result_html = open(current_dir + '/temls/result.html', 'w')
+    result_html.write(header + body + footer)
     result_html.close()
+
 
 if not sdate:
     sys.exit('Не указан день')
